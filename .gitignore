@@ -1,0 +1,9 @@
+# vs文件
+.vs
+UE4ShaderLab.sln
+
+# unreal生成文件
+Binaries
+Config
+Intermediate
+Saved
