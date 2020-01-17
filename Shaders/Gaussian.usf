@@ -1,6 +1,5 @@
-static const int SceneTextureId = 5;
 float2 TexelSize = View.ViewSizeAndInvSize.wz;
-float2 UV = GetDefaultSceneTextureUV(Parameters, SceneTextureId);
+float2 UV = GetDefaultSceneTextureUV(Parameters, PPI_PostProcessInput0);
 float3 PixelSum = float3(0, 0, 0);
 float WeightSum = 0;
 
@@ -9,13 +8,11 @@ for (int x = -Radius; x <= Radius; x++)
     for (int y = -Radius; y <= Radius; y++)
     {
     	float2 Offset = UV + float2(x, y) * TexelSize;
-		float3 PixelColor = SceneTextureLookup(Offset, SceneTextureId, 0).rgb;
+		float3 PixelColor = SceneTextureLookup(Offset, PPI_PostProcessInput0, 0).rgb;
 		float Weight = Calculate1DGaussian(x / Radius) * Calculate1DGaussian(y / Radius);
 		PixelSum += PixelColor * Weight;
 		WeightSum += Weight;
     }
 }
-
-// return SceneTextureLookup(GetDefaultSceneTextureUV(Parameters, 5), 5, false);
 
 return PixelSum / WeightSum;
