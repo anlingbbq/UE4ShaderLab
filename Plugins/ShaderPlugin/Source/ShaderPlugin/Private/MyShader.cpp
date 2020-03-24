@@ -6,6 +6,7 @@
 #include "RenderGraphBuilder.h"
 #include "Engine/World.h"
 #include "SceneInterface.h"
+#include "ShaderParameterUtils.h"
 #include "Runtime/RenderCore/Public/PixelShaderUtils.h"
 #include "Containers/DynamicRHIResourceArray.h"
 
@@ -13,7 +14,7 @@ class FSimpleScreenVertexBuffer : public FVertexBuffer
 {
 public:
 	/** Initialize the RHI for this rendering resource */
-	void InitRHI()
+	void InitRHI() override
 	{
 		TResourceArray<FFilterVertex, VERTEXBUFFER_ALIGNMENT> Vertices;
 		Vertices.SetNumUninitialized(6);
@@ -39,7 +40,6 @@ TGlobalResource<FSimpleScreenVertexBuffer> GSimpleScreenVertexBuffer;
 
 class FMyShaderVS : public FGlobalShader
 {
-public:
 	DECLARE_GLOBAL_SHADER(FMyShaderVS);
 
 public:
@@ -55,19 +55,34 @@ public:
 
 class FMyShaderPS : public FGlobalShader
 {
-public:
-	DECLARE_GLOBAL_SHADER(FGlobalShader);
-	SHADER_USE_PARAMETER_STRUCT(FMyShaderPS, FGlobalShader);
-
-	BEGIN_SHADER_PARAMETER_STRUCT(FParameters, )
-		SHADER_PARAMETER(FVector4, SimpleColor)
-	END_SHADER_PARAMETER_STRUCT()
+	DECLARE_GLOBAL_SHADER(FMyShaderPS);
 
 public:
 	static bool ShouldCompilePermutation(const FGlobalShaderPermutationParameters& Parameters)
 	{
-		return IsFeatureLevelSupported(Parameters.Platform, ERHIFeatureLevel::SM5);
+		return true;
 	}
+	
+	FMyShaderPS() {}
+	FMyShaderPS(const ShaderMetaType::CompiledShaderInitializerType& Initializer) : FGlobalShader(Initializer)
+	{
+		SimpleColor.Bind(Initializer.ParameterMap, TEXT("SimpleColor"));
+	}
+
+	void SetParameters(FRHICommandListImmediate& RHICmdList, const FLinearColor& MyColor)
+	{
+		SetShaderValue(RHICmdList, GetPixelShader(), SimpleColor, MyColor);
+	}
+
+	virtual bool Serialize(FArchive& Ar) override
+	{
+		bool bShaderHasOutdatedParameters = FGlobalShader::Serialize(Ar);
+		Ar << SimpleColor;
+		return bShaderHasOutdatedParameters;
+	}
+	
+private:
+	FShaderParameter SimpleColor;
 };
 
 IMPLEMENT_GLOBAL_SHADER(FMyShaderVS, "/ShaderPlugin/Private/MyShader.usf", "MainVS", SF_Vertex);
@@ -101,9 +116,7 @@ static void DrawMyShaderRenderTarget_RnderThread(FRHICommandListImmediate& RHICm
 	SetGraphicsPipelineState(RHICmdList, GraphicsPSOInit);
 
 	// Setup the pixel shader
-	FMyShaderPS::FParameters PassParameters;
-	PassParameters.SimpleColor = MyColor;
-	SetShaderParameters(RHICmdList, *PixelShader, PixelShader->GetPixelShader(), PassParameters);
+	PixelShader->SetParameters(RHICmdList, MyColor);
 
 	// Draw
 	RHICmdList.SetStreamSource(0, GSimpleScreenVertexBuffer.VertexBufferRHI, 0);
